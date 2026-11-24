@@ -4,9 +4,10 @@ Este projeto foi feito em Flask e simula o controle de alguns dispositivos de um
 
 O QUE O PROGRAMA FAZ
 
-Mostra a temperatura, o estado da lâmpada da sala e o estado do alarme.
+Mostra a temperatura, o estado da lâmpada da sala, o estado do alarme, o sensor de movimento da porta e o estado da porta tecnológica.
 Permite ligar e desligar a lâmpada.
 Permite ativar e desativar o alarme.
+Simula detecção de movimento na porta e abre a porta tecnológica automaticamente (quando ela não está travada), além de permitir controlar a porta manualmente.
 Pede um token para aceitar as requisições.
 Verifica os dados enviados e informa quando existe algum erro.
 Permite atender mais de uma requisição ao mesmo tempo.
@@ -19,12 +20,12 @@ O QUE PRECISA INSTALAR
 Python 3.8 ou superior
 Flask
 
-O projeto também usa as bibliotecas `logging`, `os` e `threading`, que já fazem parte do Python.
+O projeto também usa as bibliotecas logging, os e threading, que já fazem parte do Python.
 
 Biblioteca Para que é usada
 Flask Criar o servidor e as rotas da API
 logging Registrar as atividades em um arquivo
-threading Atender várias requisições e proteger os dados compartilhados com `Lock`
+threading Atender várias requisições e proteger os dados compartilhados com Lock
 os Ler as configurações do ambiente
 
 INSTALAÇÃO
@@ -42,15 +43,15 @@ Depois, instale o Flask:
 
 pip install flask
 
-Se aparecer o erro `externally managed environment`, use o ambiente virtual indicado acima.
+Se aparecer o erro externally managed environment, use o ambiente virtual indicado acima.
 
 CONFIGURAÇÕES
 
 O programa aceita duas variáveis de ambiente:
 
 Variável Valor padrão Para que serve
-`PAINEL_API_TOKEN` `token_da_casa_123` Token usado para acessar a API
-`PAINEL_LOG_FILE` `painel_casa.log` Nome ou caminho do arquivo de log
+PAINEL_API_TOKEN token_da_casa_123 Token usado para acessar a API
+PAINEL_LOG_FILE painel_casa.log Nome ou caminho do arquivo de log
 
 Exemplo de configuração:
 
@@ -66,9 +67,9 @@ Configure o token e execute:
 export PAINEL_API_TOKEN="token_da_casa_123"
 python painel.py
 
-Se o comando `python` não funcionar, tente `python3 painel.py`.
+Se o comando python não funcionar, tente python3 painel.py.
 
-O servidor usa a porta `5000` e aceita conexões de outras máquinas por estar configurado com `host=0.0.0.0`.
+O servidor usa a porta 5000 e aceita conexões de outras máquinas por estar configurado com host=0.0.0.0.
 
 Para acessar no próprio computador:
 
@@ -97,8 +98,8 @@ ROTAS DISPONÍVEIS
 A API possui duas rotas:
 
 Método Rota O que faz
-GET `/status` Mostra o estado atual da casa
-POST `/comando` Envia um comando para um dispositivo
+GET /status Mostra o estado atual da casa
+POST /comando Envia um comando para um dispositivo
 
 Todas as requisições precisam enviar o token no cabeçalho:
 
@@ -116,10 +117,9 @@ O comando é enviado em formato JSON. Por exemplo, para ligar a lâmpada:
 As ações disponíveis são:
 
 Dispositivo Ações
-`lampada_sala` `ligada` ou `desligada`
-`alarme` `ativado` ou `desativado`
+lampada_sala ligada ou desligadaalarme ativado ou desativadosensor_movimento_porta sem_movimento ou movimento_detectadoporta_tecnologica fechada, aberta ou travada
 
-A temperatura é apenas uma informação de leitura, então não aceita comandos.
+Quando sensor_movimento_porta recebe movimento_detectado, a porta_tecnologica muda automaticamente para aberta caso não esteja travada. A temperatura é apenas uma informação de leitura, então não aceita comandos.
 
 CÓDIGOS DE RESPOSTA
 
@@ -135,81 +135,109 @@ TESTANDO A API
 
 Com o servidor ligado, abra outro terminal. Os exemplos abaixo usam o token padrão. Se você configurou outro, troque o valor nos comandos.
 
-**1. Consultar o estado da casa**
+1. Consultar o estado da casa
 
 curl -i -H "Authorization: Bearer token_da_casa_123" http://localhost:5000/status
 
-O resultado esperado é o código `200` e uma resposta parecida com esta:
+O resultado esperado é o código 200 e uma resposta parecida com esta:
 
-{"alarme":"ativado","lampada_sala":"desligada","temperatura":22.5}
+{"alarme":"ativado","lampada_sala":"desligada","porta_tecnologica":"fechada","sensor_movimento_porta":"sem_movimento","temperatura":22.5}
 
-**2. Testar um token incorreto**
+2. Testar um token incorreto
 
 curl -i -H "Authorization: Bearer token_errado" http://localhost:5000/status
 
-O resultado esperado é `401`. No log, deve aparecer um aviso com o IP de origem, por exemplo:
+O resultado esperado é 401. No log, deve aparecer um aviso com o IP de origem, por exemplo:
 
 [WARNING] ... - Token invalido de 127.0.0.1
 
-**3. Consultar sem enviar token**
+3. Consultar sem enviar token
 
 curl -i http://localhost:5000/status
 
-O resultado esperado é `401`.
+O resultado esperado é 401.
 
-**4. Ligar a lâmpada**
+4. Ligar a lâmpada
 
-curl -i -X POST http://localhost:5000/comando \
--H "Authorization: Bearer token_da_casa_123" \
--H "Content-Type: application/json" \
+curl -i -X POST http://localhost:5000/comando
+
+-H "Authorization: Bearer token_da_casa_123"
+
+-H "Content-Type: application/json"
+
 -d '{"dispositivo":"lampada_sala","acao":"ligada"}'
 
-O resultado esperado é `200`. Depois, consulte `/status` novamente para confirmar que a lâmpada está ligada.
+O resultado esperado é 200. Depois, consulte /status novamente para confirmar que a lâmpada está ligada.
 
-**5. Enviar um JSON inválido**
+5. Simular movimento na porta tecnológica
 
-curl -i -X POST http://localhost:5000/comando \
--H "Authorization: Bearer token_da_casa_123" \
--H "Content-Type: application/json" \
+curl -i -X POST http://localhost:5000/comando
+
+-H "Authorization: Bearer token_da_casa_123"
+
+-H "Content-Type: application/json"
+
+-d '{"dispositivo":"sensor_movimento_porta","acao":"movimento_detectado"}'
+
+O resultado esperado é 200, abrindo a porta_tecnologica caso ela não esteja travada.
+
+6. Enviar um JSON inválido
+
+curl -i -X POST http://localhost:5000/comando
+
+-H "Authorization: Bearer token_da_casa_123"
+
+-H "Content-Type: application/json"
+
 -d 'isto nao e json'
 
-O resultado esperado é `400`.
+O resultado esperado é 400.
 
-**6. Enviar um comando sem informar a ação**
+7. Enviar um comando sem informar a ação
 
-curl -i -X POST http://localhost:5000/comando \
--H "Authorization: Bearer token_da_casa_123" \
--H "Content-Type: application/json" \
+curl -i -X POST http://localhost:5000/comando
+
+-H "Authorization: Bearer token_da_casa_123"
+
+-H "Content-Type: application/json"
+
 -d '{"dispositivo":"lampada_sala"}'
 
-O resultado esperado é `422`.
+O resultado esperado é 422.
 
-**7. Tentar controlar um dispositivo que não existe**
+8. Tentar controlar um dispositivo que não existe
 
-curl -i -X POST http://localhost:5000/comando \
--H "Authorization: Bearer token_da_casa_123" \
--H "Content-Type: application/json" \
+curl -i -X POST http://localhost:5000/comando
+
+-H "Authorization: Bearer token_da_casa_123"
+
+-H "Content-Type: application/json"
+
 -d '{"dispositivo":"garagem","acao":"ligada"}'
 
-O resultado esperado é `404`.
+O resultado esperado é 404.
 
-**8. Enviar uma ação inválida**
+9. Enviar uma ação inválida
 
-curl -i -X POST http://localhost:5000/comando \
--H "Authorization: Bearer token_da_casa_123" \
--H "Content-Type: application/json" \
+curl -i -X POST http://localhost:5000/comando
+
+-H "Authorization: Bearer token_da_casa_123"
+
+-H "Content-Type: application/json"
+
 -d '{"dispositivo":"lampada_sala","acao":"banana"}'
 
-O resultado esperado é `422`.
+O resultado esperado é 422.
 
-**9. Testar várias requisições ao mesmo tempo**
+10. Testar várias requisições ao mesmo tempo
 
 O comando abaixo envia 20 requisições, com até 10 acontecendo ao mesmo tempo:
 
-seq 20 | xargs -P 10 -I{} curl -s -o /dev/null -w "%{http_code}\n" \
+seq 20 | xargs -P 10 -I{} curl -s -o /dev/null -w "%{http_code}\n"
+
 -H "Authorization: Bearer token_da_casa_123" http://localhost:5000/status
 
-Todas devem retornar `200`. No arquivo `painel_casa.log`, o nome das threads permite ver que diferentes threads atenderam as requisições.
+Todas devem retornar 200. No arquivo painel_casa.log, o nome das threads permite ver que diferentes threads atenderam as requisições.
 
 RESUMO DOS TESTES
 
@@ -218,6 +246,7 @@ Consultar status com token correto 200
 Consultar status com token incorreto 401
 Consultar status sem token 401
 Ligar a lâmpada 200
+Simular movimento na porta tecnológica 200
 Enviar JSON inválido 400
 Enviar comando sem um campo 422
 Informar dispositivo inexistente 404
@@ -226,7 +255,4 @@ Enviar 20 requisições ao mesmo tempo Todas 200
 
 PROBLEMAS COMUNS
 
-**A porta 5000 já está em uso:** confira com `ss -tlnp | grep 5000`. Se necessário, encerre o outro processo ou altere a porta no final do arquivo `painel.py`.
-**Não consegue acessar de outro computador:** confira se o servidor está usando `host="0.0.0.0"`, se o IP está correto e se o firewall permite a porta 5000. No Ubuntu, por exemplo, use `sudo ufw allow 5000/tcp`.
-**A API sempre responde 401:** confira se o token enviado é o mesmo configurado em `PAINEL_API_TOKEN` e se o cabeçalho está no formato `Authorization: Bearer <token>`.
-**Quer conferir se o arquivo Python tem erro de sintaxe:** execute `python -m py_compile painel.py`.
+A porta 5000 já está em uso: confira com ss -tlnp | grep 5000. Se necessário, encerre o outro processo ou altere a porta no final do arquivo painel.py.Não consegue acessar de outro computador: confira se o servidor está usando host="0.0.0.0", se o IP está correto e se o firewall permite a porta 5000. No Ubuntu, por exemplo, use sudo ufw allow 5000/tcp.A API sempre responde 401: confira se o token enviado é o mesmo configurado em PAINEL_API_TOKEN e se o cabeçalho está no formato Authorization: Bearer <token>.Quer conferir se o arquivo Python tem erro de sintaxe: execute python -m py_compile painel.py.
