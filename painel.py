@@ -20,11 +20,15 @@ casa_status = {
     "temperatura": 22.5,
     "lampada_sala": "desligada",
     "alarme": "ativado",
+    "sensor_movimento_porta": "sem_movimento",
+    "porta_tecnologica": "fechada",
 }
 
 ACOES_VALIDAS = {
     "lampada_sala": {"ligada", "desligada"},
     "alarme": {"ativado", "desativado"},
+    "sensor_movimento_porta": {"sem_movimento", "movimento_detectado"},
+    "porta_tecnologica": {"fechada", "aberta", "travada"},
 }
 
 
@@ -73,6 +77,10 @@ def enviar_comando():
 
     with lock:
         casa_status[dispositivo] = acao
+        if dispositivo == "sensor_movimento_porta" and acao == "movimento_detectado":
+            if casa_status.get("porta_tecnologica") != "travada":
+                casa_status["porta_tecnologica"] = "aberta"
+                logging.info("Porta aberta automaticamente por sensor de movimento")
     logging.info("Comando executado: %s -> %s", dispositivo, acao)
     return jsonify({"ok": True, dispositivo: acao}), 200
 
