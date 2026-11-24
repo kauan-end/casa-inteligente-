@@ -1,6 +1,6 @@
 #!/bin/bash
 # Script de configuracao, execucao e diagnostico - Painel Casa Inteligente
-# Disciplina: PSI129A - Conectividade em Sistemas Ciberfisicos
+# Disciplina:  Conectividade em Sistemas Ciberfisicos
 #
 # Uso (na pasta do projeto, onde esta o painel.py):
 #   export PAINEL_API_TOKEN="seu_token"   # opcional; sem isso usa o token de teste
@@ -38,16 +38,23 @@ echo "=== [2/4] Instalando dependencias e iniciando o servidor Flask ==="
 if [ ! -x "$APP_DIR/venv/bin/python" ]; then
   sudo -u "$APP_USER" python3 -m venv "$APP_DIR/venv" || { echo "ERRO ao criar venv (instale: sudo apt install python3-venv)"; exit 1; }
 fi
-sudo -u "$APP_USER" "$APP_DIR/venv/bin/pip" install --quiet flask || { echo "ERRO ao instalar o Flask"; exit 1; }
 
-pkill -f "$APP_DIR/painel.py" 2>/dev/null || true
+if [ -f "$SCRIPT_DIR/requirements.txt" ]; then
+  sudo cp "$SCRIPT_DIR/requirements.txt" "$APP_DIR/requirements.txt"
+  sudo chown "$APP_USER:$APP_USER" "$APP_DIR/requirements.txt"
+  sudo -u "$APP_USER" "$APP_DIR/venv/bin/pip" install --quiet -r "$APP_DIR/requirements.txt" || { echo "ERRO ao instalar dependencias"; exit 1; }
+else
+  sudo -u "$APP_USER" "$APP_DIR/venv/bin/pip" install --quiet flask || { echo "ERRO ao instalar o Flask"; exit 1; }
+fi
+
+sudo pkill -f "$APP_DIR/painel.py" 2>/dev/null || true
 sleep 1
 sudo -u "$APP_USER" env PAINEL_API_TOKEN="$TOKEN" PAINEL_LOG_FILE="$LOG_FILE" \
   bash -c "cd '$APP_DIR' && nohup '$APP_DIR/venv/bin/python' '$APP_DIR/painel.py' > '$APP_DIR/server.out' 2>&1 &"
 sleep 2
 
 echo "Processo do servidor (deve rodar como $APP_USER, nao como root):"
-ps -o user=,pid=,cmd= -C python 2>/dev/null | grep painel.py || {
+ps -eo user=,pid=,args= | grep "[p]ainel.py" || {
   echo "ERRO: o servidor nao subiu. Saida:"; sudo cat "$APP_DIR/server.out"; exit 1; }
 
 echo ""
@@ -66,6 +73,12 @@ echo -e "\n--> [T04] Teste 4: Comando valido - ligar lampada (Esperado: 200)"
 curl -i -X POST -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"dispositivo":"lampada_sala","acao":"ligada"}' \
+  "$URL/comando"
+
+echo -e "\n--> Teste 4b: Sensor de movimento na porta tecnologica (Esperado: 200 e porta aberta)"
+curl -i -X POST -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"dispositivo":"sensor_movimento_porta","acao":"movimento_detectado"}' \
   "$URL/comando"
 
 echo -e "\n--> [T08] Teste 5: Acao invalida (Esperado: 422)"
@@ -90,6 +103,9 @@ echo -e "\n--> [T09] Teste 8: 20 requisicoes em paralelo (Esperado: todas 200)"
 seq 20 | xargs -P 10 -I{} curl -s -o /dev/null -w "%{http_code}\n" \
   -H "Authorization: Bearer $TOKEN" "$URL/status" | sort | uniq -c
 
+echo -e "\n--> Status final apos os comandos:"
+curl -i -H "Authorization: Bearer $TOKEN" "$URL/status"
+
 echo ""
 echo "=== [4/4] Log e comandos de diagnostico do Linux ==="
 echo "--> Conteudo do log ($LOG_FILE):"
@@ -112,4 +128,4 @@ systemctl --version | head -n 1
 
 echo ""
 echo "=== Execucao finalizada! ==="
-echo "Para parar o servidor: pkill -f $APP_DIR/painel.py"
+echo "Para parar o servidor: sudo pkill -f $APP_DIR/painel.py"
